@@ -262,6 +262,23 @@
 			<key>idVendor</key>
 			<integer>5075</integer>
 		</dict>
+		<key>SimpleMtkBtFw_MT7922_0e8d_0616</key>
+		<dict>
+			<key>CFBundleIdentifier</key>
+			<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+			<key>IOClass</key>
+			<string>SimpleMtkBtFw</string>
+			<key>IOMatchCategory</key>
+			<string>SimpleMtkBtFw</string>
+			<key>IOProbeScore</key>
+			<integer>4000</integer>
+			<key>IOProviderClass</key>
+			<string>IOUSBHostDevice</string>
+			<key>idProduct</key>
+			<integer>1558</integer>
+			<key>idVendor</key>
+			<integer>3725</integer>
+		</dict>
 		<key>SimpleMtkBtFw_MT7922_13d3_3585</key>
 		<dict>
 			<key>CFBundleIdentifier</key>
