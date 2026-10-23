@@ -38,6 +38,8 @@ iMacPro1,1, Intel desktop.
 | HFP microphone (CVSD, 8 kHz) | ⚠️ works, but quiet and choppy |
 | Wide-band speech (mSBC) | ❌ |
 | Sleep / wake | ⚠️ untested |
+| Tahoe 26 BLE HID pairing on MT7922 / RZ616 | ✅ with experimental `-smbtlefix` |
+| Logitech K251 BLE pairing on MT7922 (`0489:E0D8`) | ✅ verified |
 
 Supported USB IDs: see [`SimpleMtkBtFw/Info.plist`](SimpleMtkBtFw/Info.plist)
 (MT7921, MT7922, MT7922A and a generic MediaTek Bluetooth class match). The
@@ -71,8 +73,12 @@ Embedded firmware: `BT_RAM_CODE_MT7961_1_2_hdr.bin`,
    With these, `bluetoothd` treats the card as a third-party dongle
    (`Chipset: THIRD_PARTY_DONGLE`) instead of assuming an Apple/Broadcom
    module and sending Broadcom-only commands.
-4. Do not inject another Bluetooth firmware loader for the same device.
-5. Reboot. `system_profiler SPBluetoothDataType` should show
+4. **Tahoe 26 + MT7922/RZ616 BLE HID only:** if BLE HID devices are detected
+   but pairing spins forever without a passkey prompt, add the experimental
+   boot argument `-smbtlefix`. This workaround is opt-in and has currently
+   been verified on RZ616 / MT7922 USB `0489:E0D8` with a Logitech K251.
+5. Do not inject another Bluetooth firmware loader for the same device.
+6. Reboot. `system_profiler SPBluetoothDataType` should show
    `Chipset: THIRD_PARTY_DONGLE` and `State: On`.
 
 ## Troubleshooting
@@ -106,6 +112,12 @@ Embedded firmware: `BT_RAM_CODE_MT7961_1_2_hdr.bin`,
   sudo defaults delete /Library/Preferences/com.apple.MobileBluetooth.debug   # to disable
   ```
 
+* **Tahoe 26 BLE HID device is visible but pairing spins forever.** On the
+  tested MT7922 / RZ616 (`0489:E0D8`) setup, `bluetoothd` first waited for
+  LE PHY readiness and then stalled at `LE_READY_WAIT_FOR_LENGTH`. Enable
+  `-smbtlefix` to activate the experimental Tahoe readiness workaround.
+  Technical details: [issue #2](https://github.com/flxxxxddd/SimpleMtkBtFw/issues/2)
+  and [PR #3](https://github.com/flxxxxddd/SimpleMtkBtFw/pull/3).
 * **Music sounds like a phone call.** That is HFP, macOS switches the
   headphones into headset mode while their microphone is the selected input.
   Choose another input device.
@@ -152,6 +164,16 @@ CI builds Debug and Release on every push and pull request; pushing a tag
 * **ACL data as non-flushable.** The patcher also rewrites the ACL packet
   boundary flag from "automatically flushable" to "non-flushable" on bulk OUT
   transfers (`IOUSBHostPipe::io`), as Linux does for these controllers.
+* **Tahoe BLE HID readiness on MT7922 / RZ616.** Tahoe can establish the LE
+  link but then wait for controller readiness events that MT7922 does not
+  emit in the form `bluetoothd` expects. With the opt-in `-smbtlefix`, the
+  patcher injects the missing LE PHY Update Complete event, sends one real
+  `HCI_LE_Set_Data_Length (0x2022)` request, and converts that private
+  command's successful completion into the missing LE Data Length Change
+  event. This advances pairing into SMP and restores the passkey prompt.
+  Verified on macOS Tahoe 26 with RZ616 / MT7922 USB `0489:E0D8` and a
+  Logitech K251 BLE keyboard. See [issue #2](https://github.com/flxxxxddd/SimpleMtkBtFw/issues/2)
+  and [PR #3](https://github.com/flxxxxddd/SimpleMtkBtFw/pull/3).
 * **The Intel LE random-address workaround** inherited from
   IntelBluetoothFirmware is opt-in now (`-smbtrandaddr`).
 * **Debuggability.** A boot log ring buffer (`MtkBtLog` on the USB device),

@@ -20,6 +20,7 @@
 
 #include <IOKit/usb/IOUSBHostDevice.h>
 #include <IOKit/usb/IOUSBHostPipe.h>
+#include <IOKit/usb/IOUSBHostIOSource.h>
 
 #define DRV_NAME "smbtp"
 
@@ -29,6 +30,7 @@ typedef struct {
     void *owner;
     IOMemoryDescriptor *dataBuffer;
     IOUSBHostCompletionAction action;
+    IOUSBHostBundledCompletionAction bundledAction;
 } AsyncOwnerData;
 
 typedef struct __attribute__((packed))
@@ -42,15 +44,8 @@ typedef struct __attribute__((packed))
 {
     uint8_t     evt;
     uint8_t     len;
-} HciEventHdr;
-
-typedef struct __attribute__((packed)) 
-{
-    HciEventHdr evt;
-    uint8_t     numCommands;
-    uint16_t    opcode;
     uint8_t     data[];
-} HciResponse;
+} HciEventHdr;
 
 const char *requestDirectionNames[] = {
     "OUT",
@@ -77,7 +72,7 @@ const char* _hexDumpHCIData(uint8_t *buf, size_t len)
     if (!str)
         return nullptr;
     for (size_t i = 0; i < len; i++)
-    snprintf(str + 3 * i, (len - i) * 3, "%02x ", buf[i]);
+        snprintf(str + 3 * i, (len - i) * 3, "%02x ", buf[i]);
     str[MAX(str_len - 2, 0)] = 0;
     return str;
 }
@@ -86,22 +81,31 @@ class CSimpleMtkBtPatcher {
 public:
     bool init();
     void free();
-    
+
     void processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t address, size_t size);
     static IOReturn newFindQueueRequest(void *that, unsigned short arg1, void *addr, unsigned short arg2, bool arg3, void **hciRequestPtr);
-    
-    static IOReturn newHostDeviceRequest(void *that, IOService *provider, StandardUSB::DeviceRequest &request, void *data, IOMemoryDescriptor *descriptor, unsigned int &length,IOUSBHostCompletion *completion, unsigned int timeout);
 
-    
+    static IOReturn newHostDeviceRequest(void *that, IOService *provider, StandardUSB::DeviceRequest &request, void *data, IOMemoryDescriptor *descriptor, unsigned int &length, IOUSBHostCompletion *completion, unsigned int timeout);
+
+    static IOReturn newIOSourceIOCompletion(void *that, IOMemoryDescriptor *dataBuffer, uint32_t dataBufferLength, IOUSBHostCompletion *completion, uint32_t completionTimeoutMs);
+    static IOReturn newIOSourceIORjj(void *that, IOMemoryDescriptor *dataBuffer, uint32_t dataBufferLength, uint32_t &bytesTransferred, uint32_t completionTimeoutMs);
+    static IOReturn newIOSourceIOBundled(void *that, IOMemoryDescriptor *dataBuffer, uint32_t dataBufferLength, IOUSBHostBundledCompletion *completion, uint32_t completionTimeoutMs);
+
     mach_vm_address_t oldFindQueueRequest {};
     mach_vm_address_t oldHostDeviceRequest {};
+    mach_vm_address_t oldIOSourceIOCompletion {};
+    mach_vm_address_t oldIOSourceIORjj {};
+    mach_vm_address_t oldIOSourceIOBundled {};
+
     static IOReturn newPipeIo(void *that, IOMemoryDescriptor *dataBuffer, uint32_t dataBufferLength, IOUSBHostCompletion *completion, uint32_t completionTimeoutMs);
     mach_vm_address_t oldPipeIo {};
-    
+
     static void fixReadClock(StandardUSB::DeviceRequest &request, void *data, IOMemoryDescriptor *descriptor);
+
 private:
     static bool _randomAddressInit;
     static bool _randomAddressHack;
+    static bool _lePhyFix;
 };
 
 #endif /* SimpleMtkBtPatcher_h */
